@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lecturer dashboard</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="top-bar">
+    <h1>Lecturer dashboard</h1>
+    <button class="secondary" style="width:auto" onclick="logout()">Log out</button>
+  </div>
+  <p class="sub" id="who"></p>
+
+  <div class="card">
+    <h3>Add a course</h3>
+    <label>Course / unit title</label>
+    <input id="course-title" placeholder="e.g. Community Health Nursing">
+    <label>Unit code (optional)</label>
+    <input id="course-code" placeholder="e.g. CHN 201">
+    <button onclick="addCourse()">Add course</button>
+    <div class="error" id="course-error"></div>
+  </div>
+
+  <div class="card">
+    <h3>Upload notes</h3>
+    <label>Course</label>
+    <select id="upload-course"></select>
+    <label>Note title</label>
+    <input id="upload-title" placeholder="e.g. Postnatal care — LO2">
+    <label>PDF file</label>
+    <input id="upload-file" type="file" accept="application/pdf">
+    <button onclick="uploadNote()">Upload</button>
+    <div class="error" id="upload-error"></div>
+  </div>
+
+  <div class="card">
+    <h3>Your uploaded notes</h3>
+    <div id="notes-list"></div>
+  </div>
+</div>
+
+<script src="/js/lecturer.js"></script>
+</body>
+</html>

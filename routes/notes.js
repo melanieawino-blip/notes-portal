@@ -1,0 +1,143 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const db = require('../db/init');
+const { requireLogin, requireRole } = require('../middleware/auth');
+const upload = require('../middleware/upload');
+const { UPLOAD_DIR } = upload;
+const { extractText } = require('../utils/pdfText');
+
+const router = express.Router();
+
+// --- Upload a note (lecturer only) ---
+router.post('/upload', requireLogin, requireRole('lecturer'), upload.single('file'), async (req, res) => {
+  const { course_id, title } = req.body;
+  if (!req.file) return res.status(400).json({ error: 'No file received' });
+  if (!course_id || !title) return res.status(400).json({ error: 'course_id and title are required' });
+
+  const text = await extractText(req.file.path);
+
+  const info = db.prepare(`
+    INSERT INTO notes (course_id, uploaded_by, title, file_path, original_filename, file_size, extracted_text)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(course_id, req.user.id, title, req.file.filename, req.file.originalname, req.file.size, text);
+
+  res.json({ id: info.lastInsertRowid, title, course_id });
+});
+
+// --- List notes, optionally filtered by course ---
+router.get('/', requireLogin, (req, res) => {
+  const { course_id } = req.query;
+  const rows = course_id
+    ? db.prepare(`
+        SELECT n.id, n.title, n.original_filename, n.file_size, n.created_at, n.summary,
+               c.title AS course_title, u.name AS uploaded_by_name
+        FROM notes n
+        JOIN courses c ON c.id = n.course_id
+        JOIN users u ON u.id = n.uploaded_by
+        WHERE n.course_id = ?
+        ORDER BY n.created_at DESC
+      `).all(course_id)
+    : db.prepare(`
+        SELECT n.id, n.title, n.original_filename, n.file_size, n.created_at, n.summary,
+               c.title AS course_title, u.name AS uploaded_by_name
+        FROM notes n
+        JOIN courses c ON c.id = n.course_id
+        JOIN users u ON u.id = n.uploaded_by
+        ORDER BY n.created_at DESC
+      `).all();
+
+  res.json(rows);
+});
+
+// --- Keyword search across titles and extracted PDF text ---
+// This is today's simple version of "AI search" — plain keyword matching.
+// Later you can swap this query for a vector/embedding search without
+// touching anything else, because the text is already being stored.
+router.get('/search', requireLogin, (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json([]);
+
+  const like = `%${q}%`;
+  const rows = db.prepare(`
+    SELECT n.id, n.title, n.original_filename, n.created_at,
+           c.title AS course_title, u.name AS uploaded_by_name
+    FROM notes n
+    JOIN courses c ON c.id = n.course_id
+    JOIN users u ON u.id = n.uploaded_by
+    WHERE n.title LIKE ? OR n.extracted_text LIKE ?
+    ORDER BY n.created_at DESC
+  `).all(like, like);
+
+  res.json(rows);
+});
+
+// --- Download a note ---
+router.get('/:id/download', requireLogin, (req, res) => {
+  const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
+  if (!note) return res.status(404).json({ error: 'Note not found' });
+
+  const filePath = path.join(UPLOAD_DIR, note.file_path);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing on server' });
+
+  res.download(filePath, note.original_filename || `${note.title}.pdf`);
+});
+
+// --- Delete a note (lecturer who owns it only) ---
+router.delete('/:id', requireLogin, requireRole('lecturer'), (req, res) => {
+  const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
+  if (!note) return res.status(404).json({ error: 'Note not found' });
+  if (note.uploaded_by !== req.user.id) return res.status(403).json({ error: 'You can only delete your own notes' });
+
+  const filePath = path.join(UPLOAD_DIR, note.file_path);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  db.prepare('DELETE FROM notes WHERE id = ?').run(req.params.id);
+
+  res.json({ ok: true });
+});
+
+// --- Generate an AI summary for a note (stub — wire up later) ---
+// Left in place, disabled by default, so the frontend button already exists
+// and works the moment you add an ANTHROPIC_API_KEY to .env.
+router.post('/:id/summarize', requireLogin, requireRole('lecturer'), async (req, res) => {
+  const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
+  if (!note) return res.status(404).json({ error: 'Note not found' });
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(501).json({
+      error: 'AI summaries are not turned on yet. Add ANTHROPIC_API_KEY to .env to enable this.'
+    });
+  }
+  if (!note.extracted_text) {
+    return res.status(400).json({ error: 'No text could be read from this PDF, so it cannot be summarized' });
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        messages: [{
+          role: 'user',
+          content: `Summarize these lecture notes in 4-6 bullet points for a nursing student revising for an exam:\n\n${note.extracted_text.slice(0, 15000)}`
+        }]
+      })
+    });
+    const data = await response.json();
+    const summary = data.content?.map(b => b.text || '').join('\n').trim();
+
+    db.prepare('UPDATE notes SET summary = ? WHERE id = ?').run(summary, note.id);
+    res.json({ summary });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not generate summary right now' });
+  }
+});
+
+module.exports = router;
