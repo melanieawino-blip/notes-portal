@@ -5,7 +5,19 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('lecturer', 'student')),
+  -- Student number (e.g. DCP-1234) or staff number (e.g. STAMIU-0442).
+  id_number TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Pre-approved staff numbers. Only staff numbers listed here (and not yet
+-- claimed) can be used to create a lecturer account — see routes/auth.js.
+-- Add numbers using scripts/add-staff-number.js, not through the app itself.
+CREATE TABLE IF NOT EXISTS lecturer_staff_numbers (
+  staff_number TEXT PRIMARY KEY,
+  full_name TEXT,
+  claimed_by_user_id INTEGER REFERENCES users(id),
+  added_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Courses / units notes get attached to
@@ -35,3 +47,9 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_course ON notes(course_id);
+
+-- Backstop against the same lecturer uploading the same title twice for the
+-- same course, even if two uploads happen at nearly the same instant. The
+-- primary check lives in routes/notes.js — this just closes the race-condition gap.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_unique_title_per_lecturer_course
+  ON notes(course_id, uploaded_by, title COLLATE NOCASE);
