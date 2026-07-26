@@ -1,0 +1,32 @@
+// Adds a staff number to the pre-approved list, so that person can sign up
+// as a lecturer. Run this yourself, on your own computer or via Railway's
+// shell — it is NOT a web page, so nobody else can reach it.
+//
+// Usage:
+//   node scripts/add-staff-number.js STAMIU-0442 "Samuel Mwangi"
+//
+// If deploying to Railway, run this from Railway's "Shell" tab for your
+// service (Settings -> ... or the terminal icon), so it uses the same
+// database the live app uses.
+
+const path = require('path');
+const db = require('../db/init');
+
+const [, , staffNumber, fullName] = process.argv;
+
+if (!staffNumber) {
+  console.log('Usage: node scripts/add-staff-number.js STAFF-NUMBER "Full Name"');
+  process.exit(1);
+}
+
+try {
+  db.prepare('INSERT INTO lecturer_staff_numbers (staff_number, full_name) VALUES (?, ?)')
+    .run(staffNumber.trim(), fullName || null);
+  console.log(`Added "${staffNumber}" to the approved lecturer list.`);
+} catch (err) {
+  if (err.message.includes('UNIQUE')) {
+    console.log(`"${staffNumber}" is already on the list.`);
+  } else {
+    console.error('Error:', err.message);
+  }
+}
