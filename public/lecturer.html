@@ -27,10 +27,10 @@
     <h3>Upload notes</h3>
     <label>Course</label>
     <select id="upload-course"></select>
-    <label>Note title</label>
-    <input id="upload-title" placeholder="e.g. Postnatal care — LO2">
     <label>PDF file</label>
     <input id="upload-file" type="file" accept="application/pdf">
+    <label>Note title (optional — read automatically from the PDF if left blank)</label>
+    <input id="upload-title" placeholder="Leave blank to auto-detect from the PDF">
     <button onclick="uploadNote()">Upload</button>
     <div class="error" id="upload-error"></div>
   </div>
