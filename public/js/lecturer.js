@@ -44,12 +44,11 @@ async function uploadNote() {
   errBox.textContent = '';
 
   if (!course_id) { errBox.textContent = 'Add a course first'; return; }
-  if (!title) { errBox.textContent = 'Give the note a title'; return; }
   if (!fileInput.files[0]) { errBox.textContent = 'Choose a PDF file'; return; }
 
   const formData = new FormData();
   formData.append('course_id', course_id);
-  formData.append('title', title);
+  if (title) formData.append('title', title); // only sent if the lecturer typed an override
   formData.append('file', fileInput.files[0]);
 
   const res = await fetch('/api/notes/upload', { method: 'POST', body: formData });
