@@ -5,22 +5,45 @@ const db = require('../db/init');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { UPLOAD_DIR } = upload;
-const { extractText } = require('../utils/pdfText');
+const { parsePdf } = require('../utils/pdfText');
 
 const router = express.Router();
 
 // --- Upload a note (lecturer only) ---
+// Title is now optional: if left blank, it's read straight from the PDF
+// (its metadata title, or its first line of text, or the filename as a last
+// resort). A lecturer can still type their own title to override that.
 router.post('/upload', requireLogin, requireRole('lecturer'), upload.single('file'), async (req, res) => {
-  const { course_id, title } = req.body;
+  const { course_id, title: titleOverride } = req.body;
   if (!req.file) return res.status(400).json({ error: 'No file received' });
-  if (!course_id || !title) return res.status(400).json({ error: 'course_id and title are required' });
+  if (!course_id) return res.status(400).json({ error: 'course_id is required' });
 
-  const text = await extractText(req.file.path);
+  const { text, title: derivedTitle } = await parsePdf(req.file.path, req.file.originalname);
+  const title = (titleOverride && titleOverride.trim()) || derivedTitle;
 
-  const info = db.prepare(`
-    INSERT INTO notes (course_id, uploaded_by, title, file_path, original_filename, file_size, extracted_text)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(course_id, req.user.id, title, req.file.filename, req.file.originalname, req.file.size, text);
+  // Same lecturer can't upload two notes with the same title in the same course
+  const duplicate = db.prepare(`
+    SELECT id FROM notes WHERE course_id = ? AND uploaded_by = ? AND LOWER(title) = LOWER(?)
+  `).get(course_id, req.user.id, title);
+
+  if (duplicate) {
+    fs.unlinkSync(req.file.path); // clean up the file we already saved to disk
+    return res.status(409).json({ error: `You've already uploaded a note titled "${title}" for this course.` });
+  }
+
+  let info;
+  try {
+    info = db.prepare(`
+      INSERT INTO notes (course_id, uploaded_by, title, file_path, original_filename, file_size, extracted_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(course_id, req.user.id, title, req.file.filename, req.file.originalname, req.file.size, text);
+  } catch (err) {
+    fs.unlinkSync(req.file.path);
+    if (err.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: `You've already uploaded a note titled "${title}" for this course.` });
+    }
+    throw err;
+  }
 
   res.json({ id: info.lastInsertRowid, title, course_id });
 });
