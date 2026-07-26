@@ -1,0 +1,23 @@
+// Shows every approved staff number and whether it's been used yet to
+// create a lecturer account.
+//
+// Usage:
+//   node scripts/list-staff-numbers.js
+
+const db = require('../db/init');
+
+const rows = db.prepare(`
+  SELECT l.staff_number, l.full_name, l.added_at, u.name AS claimed_by, u.email
+  FROM lecturer_staff_numbers l
+  LEFT JOIN users u ON u.id = l.claimed_by_user_id
+  ORDER BY l.added_at
+`).all();
+
+if (rows.length === 0) {
+  console.log('No staff numbers have been added yet.');
+} else {
+  rows.forEach(r => {
+    const status = r.claimed_by ? `used by ${r.claimed_by} (${r.email})` : 'not used yet';
+    console.log(`${r.staff_number}  ${r.full_name || ''}  —  ${status}`);
+  });
+}
