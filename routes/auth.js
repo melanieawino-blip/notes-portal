@@ -6,17 +6,20 @@ const { requireLogin, JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
 
+function isAdmin(email) {
+  const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase();
+  return !!adminEmail && email.toLowerCase() === adminEmail;
+}
+
 // Sign up — role must be 'lecturer' or 'student'.
 //
-// By default, signing up as 'lecturer' requires a staff number that YOU have
-// pre-approved (added via scripts/add-staff-number.js). Set the environment
-// variable REQUIRE_STAFF_NUMBER=false to switch this check off temporarily
-// (e.g. while you're still collecting real staff numbers) — anyone can then
-// sign up as a lecturer, same as before this feature existed. Flip it back
-// to true (or just remove the variable) once you're ready to lock it down;
-// no code changes needed either way.
-const STAFF_NUMBER_CHECK_ENABLED = process.env.REQUIRE_STAFF_NUMBER !== 'false';
-
+// Signing up as 'lecturer' requires a staff number, but it's no longer
+// checked against a pre-made list. Instead, the account is created with
+// status 'pending' — the admin (see ADMIN_EMAIL) reviews it on the Admin
+// page and approves or rejects it there. A lecturer can log in right away,
+// but can't add courses or upload notes until approved (enforced in
+// middleware/auth.js's requireApprovedLecturer, checked fresh from the
+// database on every request — not something a stale login token can get around).
 router.post('/signup', async (req, res) => {
   const { name, email, password, role, id_number } = req.body;
 
@@ -26,39 +29,21 @@ router.post('/signup', async (req, res) => {
   if (!['lecturer', 'student'].includes(role)) {
     return res.status(400).json({ error: "Role must be 'lecturer' or 'student'" });
   }
-
-  if (role === 'lecturer' && STAFF_NUMBER_CHECK_ENABLED) {
-    if (!id_number || !id_number.trim()) {
-      return res.status(400).json({ error: 'Staff number is required to sign up as a lecturer' });
-    }
-    const staffNumber = id_number.trim();
-    const entry = db.prepare('SELECT * FROM lecturer_staff_numbers WHERE staff_number = ?').get(staffNumber);
-
-    if (!entry) {
-      return res.status(403).json({ error: 'That staff number is not recognized. Contact the administrator.' });
-    }
-    if (entry.claimed_by_user_id) {
-      return res.status(403).json({ error: 'That staff number has already been used to create an account.' });
-    }
+  if (role === 'lecturer' && (!id_number || !id_number.trim())) {
+    return res.status(400).json({ error: 'Staff number is required to sign up as a lecturer' });
   }
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) return res.status(409).json({ error: 'An account with that email already exists' });
 
   const password_hash = await bcrypt.hash(password, 10);
+  const status = role === 'lecturer' ? 'pending' : 'approved';
+
   const info = db.prepare(
-    'INSERT INTO users (name, email, password_hash, role, id_number) VALUES (?, ?, ?, ?, ?)'
-  ).run(name, email, password_hash, role, id_number ? id_number.trim() : null);
+    'INSERT INTO users (name, email, password_hash, role, id_number, status) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(name, email, password_hash, role, id_number ? id_number.trim() : null, status);
 
-  // Mark the staff number as claimed so it can't be reused by anyone else
-  // (only relevant when the check above is actually enabled and a real,
-  // pre-approved number was supplied)
-  if (role === 'lecturer' && STAFF_NUMBER_CHECK_ENABLED) {
-    db.prepare('UPDATE lecturer_staff_numbers SET claimed_by_user_id = ? WHERE staff_number = ?')
-      .run(info.lastInsertRowid, id_number.trim());
-  }
-
-  res.json({ id: info.lastInsertRowid, name, email, role });
+  res.json({ id: info.lastInsertRowid, name, email, role, status });
 });
 
 // Log in — sets a cookie with a signed JWT
@@ -71,7 +56,7 @@ router.post('/login', async (req, res) => {
   if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
 
   const token = jwt.sign(
-    { id: user.id, name: user.name, role: user.role },
+    { id: user.id, name: user.name, role: user.role, email: user.email, status: user.status },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -82,7 +67,7 @@ router.post('/login', async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
-  res.json({ id: user.id, name: user.name, role: user.role });
+  res.json({ id: user.id, name: user.name, role: user.role, status: user.status, is_admin: isAdmin(user.email) });
 });
 
 router.post('/logout', (req, res) => {
@@ -91,7 +76,10 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', requireLogin, (req, res) => {
-  res.json(req.user);
+  // Re-check status/is_admin fresh from the DB rather than trusting the
+  // token, so an approval that just happened shows up immediately.
+  const user = db.prepare('SELECT email, status FROM users WHERE id = ?').get(req.user.id);
+  res.json({ ...req.user, status: user ? user.status : req.user.status, is_admin: user ? isAdmin(user.email) : false });
 });
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db/init');
-const { requireLogin, requireRole } = require('../middleware/auth');
+const { requireLogin, requireRole, requireApprovedLecturer } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -10,8 +10,8 @@ router.get('/', requireLogin, (req, res) => {
   res.json(courses);
 });
 
-// Only lecturers can create new courses
-router.post('/', requireLogin, requireRole('lecturer'), (req, res) => {
+// Only approved lecturers can create new courses
+router.post('/', requireLogin, requireRole('lecturer'), requireApprovedLecturer, (req, res) => {
   const { title, unit_code } = req.body;
   if (!title) return res.status(400).json({ error: 'Course title is required' });
 

@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db/init');
-const { requireLogin, requireRole } = require('../middleware/auth');
+const { requireLogin, requireRole, requireApprovedLecturer } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { UPLOAD_DIR } = upload;
 const { parsePdf } = require('../utils/pdfText');
@@ -13,7 +13,7 @@ const router = express.Router();
 // Title is now optional: if left blank, it's read straight from the PDF
 // (its metadata title, or its first line of text, or the filename as a last
 // resort). A lecturer can still type their own title to override that.
-router.post('/upload', requireLogin, requireRole('lecturer'), upload.single('file'), async (req, res) => {
+router.post('/upload', requireLogin, requireRole('lecturer'), requireApprovedLecturer, upload.single('file'), async (req, res) => {
   const { course_id, title: titleOverride } = req.body;
   if (!req.file) return res.status(400).json({ error: 'No file received' });
   if (!course_id) return res.status(400).json({ error: 'course_id is required' });
@@ -107,7 +107,7 @@ router.get('/:id/download', requireLogin, (req, res) => {
 });
 
 // --- Delete a note (lecturer who owns it only) ---
-router.delete('/:id', requireLogin, requireRole('lecturer'), (req, res) => {
+router.delete('/:id', requireLogin, requireRole('lecturer'), requireApprovedLecturer, (req, res) => {
   const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
   if (!note) return res.status(404).json({ error: 'Note not found' });
   if (note.uploaded_by !== req.user.id) return res.status(403).json({ error: 'You can only delete your own notes' });
@@ -122,7 +122,7 @@ router.delete('/:id', requireLogin, requireRole('lecturer'), (req, res) => {
 // --- Generate an AI summary for a note (stub — wire up later) ---
 // Left in place, disabled by default, so the frontend button already exists
 // and works the moment you add an ANTHROPIC_API_KEY to .env.
-router.post('/:id/summarize', requireLogin, requireRole('lecturer'), async (req, res) => {
+router.post('/:id/summarize', requireLogin, requireRole('lecturer'), requireApprovedLecturer, async (req, res) => {
   const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
   if (!note) return res.status(404).json({ error: 'Note not found' });
 
