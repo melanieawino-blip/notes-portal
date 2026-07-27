@@ -31,4 +31,31 @@ router.post('/lecturers/:id/reject', requireLogin, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Auto-approve staff number list management
+router.get('/auto-approve', requireLogin, requireAdmin, (req, res) => {
+  const rows = db.prepare('SELECT id, staff_number, added_at FROM auto_approve_staff_numbers ORDER BY added_at DESC').all();
+  res.json(rows);
+});
+
+router.post('/auto-approve', requireLogin, requireAdmin, (req, res) => {
+  const { staff_number } = req.body;
+  if (!staff_number || !staff_number.trim()) {
+    return res.status(400).json({ error: 'Staff number is required' });
+  }
+  try {
+    const info = db.prepare('INSERT INTO auto_approve_staff_numbers (staff_number) VALUES (?)').run(staff_number.trim());
+    res.json({ id: info.lastInsertRowid, staff_number: staff_number.trim() });
+  } catch (err) {
+    if (err.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'That staff number is already on the list' });
+    }
+    res.status(500).json({ error: 'Could not add staff number' });
+  }
+});
+
+router.delete('/auto-approve/:id', requireLogin, requireAdmin, (req, res) => {
+  const info = db.prepare('DELETE FROM auto_approve_staff_numbers WHERE id = ?').run(req.params.id);
+  if (info.changes === 0) return res.status(404).json({ error: 'Entry not found' });
+  res.json({ ok: true });
+});
 module.exports = router;
