@@ -1,9 +1,18 @@
 let courses = [];
+let myStatus = 'approved';
 
 async function init() {
   const me = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null);
   if (!me || me.role !== 'lecturer') { window.location.href = '/'; return; }
   document.getElementById('who').textContent = `Logged in as ${me.name} (lecturer)`;
+  myStatus = me.status;
+
+  if (me.status === 'pending') {
+    document.getElementById('pending-banner').style.display = 'block';
+  }
+  if (me.is_admin) {
+    document.getElementById('admin-link').style.display = 'inline-block';
+  }
 
   await loadCourses();
   await loadNotes();
