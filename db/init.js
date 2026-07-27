@@ -66,5 +66,17 @@ try {
   // duplicate titles just aren't blocked yet until this is investigated.
   console.error('Could not apply duplicate-title index (app will still run):', err.message);
 }
-
+// --- New table: staff numbers that should skip the pending queue and be
+// auto-approved on signup. Admin manages this list from the dashboard.
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS auto_approve_staff_numbers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      staff_number TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      added_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+} catch (err) {
+  console.error('Could not create auto_approve_staff_numbers table (app will still run):', err.message);
+}
 module.exports = db;
