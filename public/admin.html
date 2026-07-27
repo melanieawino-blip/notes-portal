@@ -16,8 +16,17 @@
   <div class="card">
     <div id="lecturers-list"></div>
   </div>
-</div>
 
+  <div class="card">
+    <h2>Auto-approve staff numbers</h2>
+    <p class="sub">Lecturers signing up with a staff number on this list skip the pending queue automatically.</p>
+    <form id="auto-approve-form" onsubmit="return addAutoApprove(event)">
+      <input type="text" id="new-staff-number" placeholder="Staff number" required>
+      <button type="submit" style="width:auto">Add</button>
+    </form>
+    <div id="auto-approve-list"></div>
+  </div>
+</div>
 <script src="/js/admin.js"></script>
 </body>
 </html>
