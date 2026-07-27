@@ -29,10 +29,12 @@
     <label>Password</label>
     <input id="signup-password" type="password">
     <label>I am a...</label>
-    <select id="signup-role">
+    <select id="signup-role" onchange="onRoleChange()">
       <option value="student">Student</option>
       <option value="lecturer">Lecturer</option>
     </select>
+    <label id="id-number-label">Student number (e.g. DCP-1234)</label>
+    <input id="signup-id-number" type="text">
     <button onclick="signup()">Create account</button>
     <div class="error" id="signup-error"></div>
   </div>

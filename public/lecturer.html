@@ -9,9 +9,16 @@
 <div class="wrap">
   <div class="top-bar">
     <h1>Lecturer dashboard</h1>
-    <button class="secondary" style="width:auto" onclick="logout()">Log out</button>
+    <div style="display:flex;gap:8px">
+      <a id="admin-link" href="/admin.html" style="display:none"><button class="secondary" style="width:auto">Admin</button></a>
+      <button class="secondary" style="width:auto" onclick="logout()">Log out</button>
+    </div>
   </div>
   <p class="sub" id="who"></p>
+  <div class="card" id="pending-banner" style="display:none; border-color:#c99; background:#fff8f0">
+    <strong>Your lecturer account is awaiting admin approval.</strong>
+    <p class="note-meta">You can log in, but adding courses and uploading notes will be available once approved.</p>
+  </div>
 
   <div class="card">
     <h3>Add a course</h3>
