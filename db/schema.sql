@@ -47,9 +47,3 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_course ON notes(course_id);
-
--- Backstop against the same lecturer uploading the same title twice for the
--- same course, even if two uploads happen at nearly the same instant. The
--- primary check lives in routes/notes.js — this just closes the race-condition gap.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_unique_title_per_lecturer_course
-  ON notes(course_id, uploaded_by, title COLLATE NOCASE);
