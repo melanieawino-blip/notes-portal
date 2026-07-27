@@ -5,14 +5,10 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('lecturer', 'student')),
-  -- Student number (e.g. DCP-1234) or staff number (e.g. STAMIU-0442).
   id_number TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- Pre-approved staff numbers. Only staff numbers listed here (and not yet
--- claimed) can be used to create a lecturer account — see routes/auth.js.
--- Add numbers using scripts/add-staff-number.js, not through the app itself.
 CREATE TABLE IF NOT EXISTS lecturer_staff_numbers (
   staff_number TEXT PRIMARY KEY,
   full_name TEXT,
@@ -20,14 +16,12 @@ CREATE TABLE IF NOT EXISTS lecturer_staff_numbers (
   added_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- Courses / units notes get attached to
 CREATE TABLE IF NOT EXISTS courses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   unit_code TEXT
 );
 
--- Notes: one row per uploaded PDF
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   course_id INTEGER NOT NULL REFERENCES courses(id),
@@ -36,12 +30,7 @@ CREATE TABLE IF NOT EXISTS notes (
   file_path TEXT NOT NULL,
   original_filename TEXT,
   file_size INTEGER,
-  -- Full text pulled out of the PDF at upload time. Not used yet, but this is
-  -- exactly what you'll search over later ("find every note that mentions
-  -- DHIS2") without needing to re-process every PDF you've already uploaded.
   extracted_text TEXT,
-  -- AI-generated summary, filled in on demand later by calling an LLM.
-  -- NULL until a lecturer asks for one.
   summary TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
