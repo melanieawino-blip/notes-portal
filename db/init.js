@@ -16,14 +16,11 @@ db.pragma('journal_mode = WAL');
 
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 db.exec(schema);
-
 // --- Safe migration: enforce "no duplicate note title per lecturer per
 // course" on databases that may already contain data from before this rule
 // existed. Creating this as a plain CREATE UNIQUE INDEX would crash the app
 // on startup if any old duplicates are already present — so instead we
-// rename any duplicates out of the way first, then add the index. This
-// never deletes anything; old duplicate notes just get "(older upload)"
-// appended to their title so they're still visible and downloadable.
+// rename any duplicates out of the way first, then add the index.
 try {
   const duplicates = db.prepare(`
     SELECT id, title, course_id, uploaded_by
@@ -48,8 +45,6 @@ try {
       ON notes(course_id, uploaded_by, title COLLATE NOCASE)
   `);
 } catch (err) {
-  // Never let this migration step take the whole app down — worst case,
-  // duplicate titles just aren't blocked yet until this is investigated.
   console.error('Could not apply duplicate-title index (app will still run):', err.message);
 }
 
