@@ -8,7 +8,7 @@ body {
 .wrap {
   max-width: 720px;
   margin: 0 auto;
-  padding: 32px 20px;
+  padding: 24px 16px;
 }
 h1 { font-size: 22px; margin-bottom: 4px; }
 .sub { color: #666; margin-top: 0; margin-bottom: 24px; }
@@ -16,13 +16,13 @@ h1 { font-size: 22px; margin-bottom: 4px; }
   background: #fff;
   border: 1px solid #e2e2dd;
   border-radius: 10px;
-  padding: 20px;
+  padding: 18px;
   margin-bottom: 16px;
 }
-label { display: block; font-size: 13px; color: #555; margin: 12px 0 4px; }
+label { display: block; font-size: 14px; color: #555; margin: 12px 0 4px; }
 input, select, button {
-  font-size: 15px;
-  padding: 9px 10px;
+  font-size: 16px;
+  padding: 11px 12px;
   border-radius: 6px;
   border: 1px solid #ccc;
   width: 100%;
@@ -34,7 +34,8 @@ button {
   cursor: pointer;
   margin-top: 14px;
   width: auto;
-  padding: 9px 18px;
+  padding: 11px 20px;
+  min-height: 44px;
 }
 button:hover { background: #085041; }
 button.secondary { background: #888; }
@@ -46,6 +47,7 @@ button.danger { background: #a32d2d; }
   border-bottom: 1px solid #eee;
   padding: 10px 0;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .note-title { font-weight: 500; }
 .note-meta { font-size: 12px; color: #777; }
@@ -54,6 +56,8 @@ button.danger { background: #a32d2d; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .summary-box {
   background: #f4f5f2;
@@ -62,4 +66,29 @@ button.danger { background: #a32d2d; }
   font-size: 13px;
   margin-top: 8px;
   white-space: pre-wrap;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+  padding: 10px 0;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#auto-approve-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+#auto-approve-form input { flex: 1; }
+#auto-approve-form button { margin-top: 0; }
+
+@media (max-width: 480px) {
+  .wrap { padding: 16px 12px; }
+  h1 { font-size: 19px; }
+  .card { padding: 14px; }
+  #auto-approve-form { flex-direction: column; }
+  #auto-approve-form input, #auto-approve-form button { width: 100%; }
 }
