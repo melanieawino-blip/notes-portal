@@ -2,6 +2,9 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
+// If DATA_DIR is set (e.g. pointing at a Railway volume), the database file
+// lives there so it survives redeploys. Otherwise it defaults to this folder,
+// which is fine for local development.
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -14,6 +17,27 @@ db.pragma('journal_mode = WAL');
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 db.exec(schema);
 
+// --- Safe migration: add the 'status' column (pending/approved/rejected)
+// to a database that was created before this column existed. Existing rows
+// (including any lecturers already using the app) default to 'approved' so
+// nobody who could already log in gets locked out by this change.
+try {
+  const userColumns = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+  if (!userColumns.includes('status')) {
+    console.log('Adding status column to users table...');
+    db.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+  }
+} catch (err) {
+  console.error('Could not add status column (app will still run):', err.message);
+}
+
+// --- Safe migration: enforce "no duplicate note title per lecturer per
+// course" on databases that may already contain data from before this rule
+// existed. Creating this as a plain CREATE UNIQUE INDEX would crash the app
+// on startup if any old duplicates are already present — so instead we
+// rename any duplicates out of the way first, then add the index. This
+// never deletes anything; old duplicate notes just get "(older upload)"
+// appended to their title so they're still visible and downloadable.
 try {
   const duplicates = db.prepare(`
     SELECT id, title, course_id, uploaded_by
@@ -28,7 +52,7 @@ try {
   `).all();
 
   if (duplicates.length > 0) {
-    console.log(`Renaming ${duplicates.length} duplicate note title(s)...`);
+    console.log(`Renaming ${duplicates.length} duplicate note title(s) found from before this rule existed...`);
     const rename = db.prepare('UPDATE notes SET title = title || ? WHERE id = ?');
     duplicates.forEach((row, i) => rename.run(` (older upload ${i + 1})`, row.id));
   }
@@ -38,6 +62,8 @@ try {
       ON notes(course_id, uploaded_by, title COLLATE NOCASE)
   `);
 } catch (err) {
+  // Never let this migration step take the whole app down — worst case,
+  // duplicate titles just aren't blocked yet until this is investigated.
   console.error('Could not apply duplicate-title index (app will still run):', err.message);
 }
 

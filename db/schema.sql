@@ -5,23 +5,23 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('lecturer', 'student')),
+  -- Student number (e.g. DCP-1234) or staff number (e.g. STAMIU-0442).
   id_number TEXT,
+  -- Students are always 'approved'. Lecturers start 'pending' and need the
+  -- admin (see ADMIN_EMAIL) to approve them on the Admin page before they
+  -- can add courses or upload notes. See middleware/auth.js requireApprovedLecturer.
+  status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN ('pending', 'approved', 'rejected')),
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS lecturer_staff_numbers (
-  staff_number TEXT PRIMARY KEY,
-  full_name TEXT,
-  claimed_by_user_id INTEGER REFERENCES users(id),
-  added_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
+-- Courses / units notes get attached to
 CREATE TABLE IF NOT EXISTS courses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   unit_code TEXT
 );
 
+-- Notes: one row per uploaded PDF
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   course_id INTEGER NOT NULL REFERENCES courses(id),
@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS notes (
   file_path TEXT NOT NULL,
   original_filename TEXT,
   file_size INTEGER,
+  -- Full text pulled out of the PDF at upload time. Not used yet, but this is
+  -- exactly what you'll search over later ("find every note that mentions
+  -- DHIS2") without needing to re-process every PDF you've already uploaded.
   extracted_text TEXT,
+  -- AI-generated summary, filled in on demand later by calling an LLM.
+  -- NULL until a lecturer asks for one.
   summary TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
