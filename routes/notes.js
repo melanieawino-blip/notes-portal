@@ -48,19 +48,23 @@ router.post('/upload', requireLogin, requireRole('lecturer'), requireApprovedLec
   res.json({ id: info.lastInsertRowid, title, course_id });
 });
 
-// --- List notes, optionally filtered by course, and optionally scoped to
-// only the logged-in user's own uploads (mine=true). The lecturer dashboard
-// always sends mine=true, so a lecturer only ever sees and can act on their
-// own notes — never another lecturer's. Students never send mine=true, so
-// they still see everything for a course as intended.
+// --- List notes, optionally filtered by course and/or by lecturer, and
+// optionally scoped to only the logged-in user's own uploads (mine=true).
+// The lecturer dashboard always sends mine=true, so a lecturer only ever
+// sees and can act on their own notes — never another lecturer's. Students
+// send course_id and/or lecturer_id to narrow down what they're browsing.
 router.get('/', requireLogin, (req, res) => {
-  const { course_id, mine } = req.query;
+  const { course_id, lecturer_id, mine } = req.query;
   const conditions = [];
   const params = [];
 
   if (course_id) {
     conditions.push('n.course_id = ?');
     params.push(course_id);
+  }
+  if (lecturer_id) {
+    conditions.push('n.uploaded_by = ?');
+    params.push(lecturer_id);
   }
   if (mine === 'true') {
     conditions.push('n.uploaded_by = ?');
@@ -78,6 +82,21 @@ router.get('/', requireLogin, (req, res) => {
     ${whereClause}
     ORDER BY n.created_at DESC
   `).all(...params);
+
+  res.json(rows);
+});
+
+// --- List lecturers who have published at least one note, for the
+// student-side "filter by lecturer" dropdown. Only includes lecturers with
+// actual notes up, so the list stays relevant rather than showing everyone
+// who's ever signed up.
+router.get('/lecturers', requireLogin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT DISTINCT u.id, u.name
+    FROM notes n
+    JOIN users u ON u.id = n.uploaded_by
+    ORDER BY u.name
+  `).all();
 
   res.json(rows);
 });
