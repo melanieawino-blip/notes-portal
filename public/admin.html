@@ -12,21 +12,24 @@
     <button class="secondary" style="width:auto" onclick="logout()">Log out</button>
   </div>
   <p class="sub" id="who"></p>
+  <p class="sub" id="pending-count" style="font-weight:600"></p>
 
   <div class="card">
+    <h3>Auto-approved emails</h3>
+    <p class="note-meta">A lecturer signing up with one of these emails is approved instantly — no review needed. This list grows automatically every time you approve someone below, or you can add one directly here ahead of time.</p>
+    <label>Email address</label>
+    <input id="new-auto-email" placeholder="e.g. samuel.mwangi@amref.org">
+    <button onclick="addAutoApprove()">Add</button>
+    <div class="error" id="auto-approve-error"></div>
+    <div id="auto-approve-list" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Lecturer signups</h3>
     <div id="lecturers-list"></div>
   </div>
-
-  <div class="card">
-    <h2>Auto-approve staff numbers</h2>
-    <p class="sub">Lecturers signing up with a staff number on this list skip the pending queue automatically.</p>
-    <form id="auto-approve-form" onsubmit="return addAutoApprove(event)">
-      <input type="text" id="new-staff-number" placeholder="Staff number" required>
-      <button type="submit" style="width:auto">Add</button>
-    </form>
-    <div id="auto-approve-list"></div>
-  </div>
 </div>
+
 <script src="/js/admin.js"></script>
 </body>
 </html>
