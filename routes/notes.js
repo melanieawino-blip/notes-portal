@@ -48,27 +48,36 @@ router.post('/upload', requireLogin, requireRole('lecturer'), requireApprovedLec
   res.json({ id: info.lastInsertRowid, title, course_id });
 });
 
-// --- List notes, optionally filtered by course ---
+// --- List notes, optionally filtered by course, and optionally scoped to
+// only the logged-in user's own uploads (mine=true). The lecturer dashboard
+// always sends mine=true, so a lecturer only ever sees and can act on their
+// own notes — never another lecturer's. Students never send mine=true, so
+// they still see everything for a course as intended.
 router.get('/', requireLogin, (req, res) => {
-  const { course_id } = req.query;
-  const rows = course_id
-    ? db.prepare(`
-        SELECT n.id, n.title, n.original_filename, n.file_size, n.created_at, n.summary,
-               c.title AS course_title, u.name AS uploaded_by_name
-        FROM notes n
-        JOIN courses c ON c.id = n.course_id
-        JOIN users u ON u.id = n.uploaded_by
-        WHERE n.course_id = ?
-        ORDER BY n.created_at DESC
-      `).all(course_id)
-    : db.prepare(`
-        SELECT n.id, n.title, n.original_filename, n.file_size, n.created_at, n.summary,
-               c.title AS course_title, u.name AS uploaded_by_name
-        FROM notes n
-        JOIN courses c ON c.id = n.course_id
-        JOIN users u ON u.id = n.uploaded_by
-        ORDER BY n.created_at DESC
-      `).all();
+  const { course_id, mine } = req.query;
+  const conditions = [];
+  const params = [];
+
+  if (course_id) {
+    conditions.push('n.course_id = ?');
+    params.push(course_id);
+  }
+  if (mine === 'true') {
+    conditions.push('n.uploaded_by = ?');
+    params.push(req.user.id);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const rows = db.prepare(`
+    SELECT n.id, n.title, n.original_filename, n.file_size, n.created_at, n.summary,
+           c.title AS course_title, u.name AS uploaded_by_name
+    FROM notes n
+    JOIN courses c ON c.id = n.course_id
+    JOIN users u ON u.id = n.uploaded_by
+    ${whereClause}
+    ORDER BY n.created_at DESC
+  `).all(...params);
 
   res.json(rows);
 });
@@ -117,50 +126,6 @@ router.delete('/:id', requireLogin, requireRole('lecturer'), requireApprovedLect
   db.prepare('DELETE FROM notes WHERE id = ?').run(req.params.id);
 
   res.json({ ok: true });
-});
-
-// --- Generate an AI summary for a note (stub — wire up later) ---
-// Left in place, disabled by default, so the frontend button already exists
-// and works the moment you add an ANTHROPIC_API_KEY to .env.
-router.post('/:id/summarize', requireLogin, requireRole('lecturer'), requireApprovedLecturer, async (req, res) => {
-  const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
-  if (!note) return res.status(404).json({ error: 'Note not found' });
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(501).json({
-      error: 'AI summaries are not turned on yet. Add ANTHROPIC_API_KEY to .env to enable this.'
-    });
-  }
-  if (!note.extracted_text) {
-    return res.status(400).json({ error: 'No text could be read from this PDF, so it cannot be summarized' });
-  }
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 400,
-        messages: [{
-          role: 'user',
-          content: `Summarize these lecture notes in 4-6 bullet points for a nursing student revising for an exam:\n\n${note.extracted_text.slice(0, 15000)}`
-        }]
-      })
-    });
-    const data = await response.json();
-    const summary = data.content?.map(b => b.text || '').join('\n').trim();
-
-    db.prepare('UPDATE notes SET summary = ? WHERE id = ?').run(summary, note.id);
-    res.json({ summary });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not generate summary right now' });
-  }
 });
 
 module.exports = router;
