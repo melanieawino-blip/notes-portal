@@ -70,27 +70,21 @@ async function uploadNote() {
 }
 
 async function loadNotes() {
-  const notes = await fetch('/api/notes').then(r => r.json());
+  const notes = await fetch('/api/notes?mine=true').then(r => r.json());
   const list = document.getElementById('notes-list');
 
   if (notes.length === 0) {
-    list.innerHTML = '<p class="note-meta">No notes uploaded yet.</p>';
+    list.innerHTML = '<p class="note-meta">You haven\'t uploaded any notes yet.</p>';
     return;
   }
 
   list.innerHTML = notes.map(n => `
-    <div class="note-row" style="flex-direction:column;align-items:stretch">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div class="note-title">${n.title}</div>
-          <div class="note-meta">${n.course_title} · uploaded by ${n.uploaded_by_name} · ${new Date(n.created_at).toLocaleDateString()}</div>
-        </div>
-        <div style="display:flex;gap:6px">
-          <button style="width:auto" onclick="summarize(${n.id})">AI summary</button>
-          <button class="danger" style="width:auto" onclick="deleteNote(${n.id})">Delete</button>
-        </div>
+    <div class="note-row">
+      <div>
+        <div class="note-title">${n.title}</div>
+        <div class="note-meta">${n.course_title} · ${new Date(n.created_at).toLocaleDateString()}</div>
       </div>
-      ${n.summary ? `<div class="summary-box">${n.summary}</div>` : `<div class="summary-box" id="summary-${n.id}" style="display:none"></div>`}
+      <button class="danger" style="width:auto" onclick="deleteNote(${n.id})">Delete</button>
     </div>
   `).join('');
 }
@@ -98,13 +92,6 @@ async function loadNotes() {
 async function deleteNote(id) {
   if (!confirm('Delete this note?')) return;
   await fetch(`/api/notes/${id}`, { method: 'DELETE' });
-  await loadNotes();
-}
-
-async function summarize(id) {
-  const res = await fetch(`/api/notes/${id}/summarize`, { method: 'POST' });
-  const data = await res.json();
-  if (!res.ok) { alert(data.error); return; }
   await loadNotes();
 }
 
