@@ -41,3 +41,14 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_course ON notes(course_id);
+
+-- Email addresses that skip the pending queue entirely. A lecturer signing
+-- up with one of these emails is approved instantly. This list grows two
+-- ways: you add an email here yourself ahead of time, or it's added
+-- automatically the moment you approve a lecturer through the Admin page —
+-- so that same email is trusted permanently, even if that account is ever
+-- deleted and they sign up again later.
+CREATE TABLE IF NOT EXISTS auto_approved_emails (
+  email TEXT PRIMARY KEY COLLATE NOCASE,
+  added_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
