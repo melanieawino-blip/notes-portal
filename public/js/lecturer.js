@@ -78,13 +78,26 @@ async function loadNotes() {
     return;
   }
 
-  list.innerHTML = notes.map(n => `
-    <div class="note-row">
-      <div>
-        <div class="note-title">${n.title}</div>
-        <div class="note-meta">${n.course_title} · ${new Date(n.created_at).toLocaleDateString()}</div>
-      </div>
-      <button class="danger" style="width:auto" onclick="deleteNote(${n.id})">Delete</button>
+  // Group notes under their course/unit title, so "First Aid", "Anatomy",
+  // "Maternal Child Health" etc. each show their own notes separately.
+  const byCourse = {};
+  notes.forEach(n => {
+    if (!byCourse[n.course_title]) byCourse[n.course_title] = [];
+    byCourse[n.course_title].push(n);
+  });
+
+  list.innerHTML = Object.keys(byCourse).sort().map(courseTitle => `
+    <div style="margin-bottom:20px">
+      <h4 style="margin:0 0 6px">${courseTitle}</h4>
+      ${byCourse[courseTitle].map(n => `
+        <div class="note-row">
+          <div>
+            <div class="note-title">${n.title}</div>
+            <div class="note-meta">${new Date(n.created_at).toLocaleDateString()}</div>
+          </div>
+          <button class="danger" style="width:auto" onclick="deleteNote(${n.id})">Delete</button>
+        </div>
+      `).join('')}
     </div>
   `).join('');
 }
