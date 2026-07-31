@@ -6,9 +6,14 @@ async function init() {
   document.getElementById('who').textContent = `Logged in as ${me.name} (student)`;
 
   const courses = await fetch('/api/courses').then(r => r.json());
-  const select = document.getElementById('course-filter');
-  select.innerHTML = '<option value="">All courses</option>' +
+  const courseSelect = document.getElementById('course-filter');
+  courseSelect.innerHTML = '<option value="">All courses</option>' +
     courses.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
+
+  const lecturers = await fetch('/api/notes/lecturers').then(r => r.json());
+  const lecturerSelect = document.getElementById('lecturer-filter');
+  lecturerSelect.innerHTML = '<option value="">All lecturers</option>' +
+    lecturers.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
 
   await loadNotes();
 }
@@ -21,10 +26,19 @@ function onSearch() {
 async function loadNotes() {
   const q = document.getElementById('search-box').value.trim();
   const course_id = document.getElementById('course-filter').value;
+  const lecturer_id = document.getElementById('lecturer-filter').value;
 
+  // Keyword search stays its own thing (searches inside PDF text too), but
+  // the course and lecturer filters can be combined together freely.
   const url = q
     ? `/api/notes/search?q=${encodeURIComponent(q)}`
-    : `/api/notes${course_id ? `?course_id=${course_id}` : ''}`;
+    : (() => {
+        const params = new URLSearchParams();
+        if (course_id) params.set('course_id', course_id);
+        if (lecturer_id) params.set('lecturer_id', lecturer_id);
+        const qs = params.toString();
+        return `/api/notes${qs ? `?${qs}` : ''}`;
+      })();
 
   const notes = await fetch(url).then(r => r.json());
   renderNotes(notes);
