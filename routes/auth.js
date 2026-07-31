@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db/init');
 const { requireLogin, JWT_SECRET } = require('../middleware/auth');
-const { notifyAdminOfLecturerSignup } = require('../utils/notify');
+
 const router = express.Router();
 
 function isAdmin(email) {
@@ -13,12 +13,19 @@ function isAdmin(email) {
 
 // Sign up — role must be 'lecturer' or 'student'.
 //
-// Lecturers whose staff number is on the auto-approve list (managed by
-// the admin) get status 'approved' immediately. Everyone else gets
-// 'pending' and needs admin review. Either way, the admin gets an email
-// notification, and pending signups also show up on the dashboard.
+// Signing up as 'lecturer' still requires a staff number for your records,
+// but it's the EMAIL that determines instant approval: if this email is on
+// the auto_approved_emails list (added by you directly, or automatically
+// the first time you approve that person — see routes/admin.js), the
+// account is approved immediately. Otherwise it's created as 'pending' —
+// you review it on the Admin page and approve or reject it there. A
+// lecturer can log in right away either way, but can't add courses or
+// upload notes until approved (enforced in middleware/auth.js's
+// requireApprovedLecturer, checked fresh from the database on every
+// request — not something a stale login token can get around).
 router.post('/signup', async (req, res) => {
   const { name, email, password, role, id_number } = req.body;
+
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'Name, email, password and role are all required' });
   }
@@ -28,48 +35,52 @@ router.post('/signup', async (req, res) => {
   if (role === 'lecturer' && (!id_number || !id_number.trim())) {
     return res.status(400).json({ error: 'Staff number is required to sign up as a lecturer' });
   }
+
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   if (existing) return res.status(409).json({ error: 'An account with that email already exists' });
 
   const password_hash = await bcrypt.hash(password, 10);
-  const trimmedStaffNumber = id_number ? id_number.trim() : null;
 
-  let status = role === 'lecturer' ? 'pending' : 'approved';
-  if (role === 'lecturer' && trimmedStaffNumber) {
-    const autoApproved = db.prepare(
-      'SELECT id FROM auto_approve_staff_numbers WHERE staff_number = ? COLLATE NOCASE'
-    ).get(trimmedStaffNumber);
-    if (autoApproved) status = 'approved';
+  let status = 'approved';
+  if (role === 'lecturer') {
+    const trusted = db.prepare('SELECT 1 FROM auto_approved_emails WHERE email = ?').get(email);
+    status = trusted ? 'approved' : 'pending';
   }
 
   const info = db.prepare(
     'INSERT INTO users (name, email, password_hash, role, id_number, status) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(name, email, password_hash, role, trimmedStaffNumber, status);
-
-  if (role === 'lecturer') {
-    notifyAdminOfLecturerSignup({ name, email, staff_number: trimmedStaffNumber, status });
-  }
+  ).run(name, email, password_hash, role, id_number ? id_number.trim() : null, status);
 
   res.json({ id: info.lastInsertRowid, name, email, role, status });
 });
 
-// Log in — sets a cookie with a signed JWT
+// Log in — sets a cookie with a signed JWT. This lasts 180 days, so once
+// someone logs in on their phone/tablet/computer, they stay logged in on
+// that device for about six months without needing to type their password
+// again — they'll only be asked again if they explicitly log out, clear
+// their browser data, or switch devices.
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
   if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
+
+  const SESSION_LENGTH_DAYS = 180;
+
   const token = jwt.sign(
     { id: user.id, name: user.name, role: user.role, email: user.email, status: user.status },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: `${SESSION_LENGTH_DAYS}d` }
   );
+
   res.cookie('token', token, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge: SESSION_LENGTH_DAYS * 24 * 60 * 60 * 1000
   });
+
   res.json({ id: user.id, name: user.name, role: user.role, status: user.status, is_admin: isAdmin(user.email) });
 });
 
