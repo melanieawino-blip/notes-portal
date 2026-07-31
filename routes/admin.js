@@ -19,9 +19,16 @@ router.get('/lecturers', requireLogin, requireAdmin, (req, res) => {
   res.json(rows);
 });
 
+// Approving looks up the lecturer's email and adds it to the trusted list,
+// so that same email is auto-approved forever after — even if this exact
+// account is ever deleted and they sign up again later.
 router.post('/lecturers/:id/approve', requireLogin, requireAdmin, (req, res) => {
-  const info = db.prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role = 'lecturer'").run(req.params.id);
-  if (info.changes === 0) return res.status(404).json({ error: 'Lecturer not found' });
+  const lecturer = db.prepare("SELECT email FROM users WHERE id = ? AND role = 'lecturer'").get(req.params.id);
+  if (!lecturer) return res.status(404).json({ error: 'Lecturer not found' });
+
+  db.prepare("UPDATE users SET status = 'approved' WHERE id = ?").run(req.params.id);
+  db.prepare('INSERT OR IGNORE INTO auto_approved_emails (email) VALUES (?)').run(lecturer.email);
+
   res.json({ ok: true });
 });
 
@@ -31,31 +38,34 @@ router.post('/lecturers/:id/reject', requireLogin, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// Auto-approve staff number list management
+// --- Auto-approved emails ---
+// Anyone signing up as a lecturer with an email on this list skips the
+// pending queue entirely. Grows automatically as you approve lecturers, and
+// you can also add emails here directly ahead of time.
 router.get('/auto-approve', requireLogin, requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT id, staff_number, added_at FROM auto_approve_staff_numbers ORDER BY added_at DESC').all();
+  const rows = db.prepare('SELECT email, added_at FROM auto_approved_emails ORDER BY added_at DESC').all();
   res.json(rows);
 });
 
 router.post('/auto-approve', requireLogin, requireAdmin, (req, res) => {
-  const { staff_number } = req.body;
-  if (!staff_number || !staff_number.trim()) {
-    return res.status(400).json({ error: 'Staff number is required' });
+  const { email } = req.body;
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'Email is required' });
   }
   try {
-    const info = db.prepare('INSERT INTO auto_approve_staff_numbers (staff_number) VALUES (?)').run(staff_number.trim());
-    res.json({ id: info.lastInsertRowid, staff_number: staff_number.trim() });
+    db.prepare('INSERT INTO auto_approved_emails (email) VALUES (?)').run(email.trim());
   } catch (err) {
     if (err.message.includes('UNIQUE')) {
-      return res.status(409).json({ error: 'That staff number is already on the list' });
+      return res.status(409).json({ error: 'That email is already on the auto-approve list' });
     }
-    res.status(500).json({ error: 'Could not add staff number' });
+    throw err;
   }
-});
-
-router.delete('/auto-approve/:id', requireLogin, requireAdmin, (req, res) => {
-  const info = db.prepare('DELETE FROM auto_approve_staff_numbers WHERE id = ?').run(req.params.id);
-  if (info.changes === 0) return res.status(404).json({ error: 'Entry not found' });
   res.json({ ok: true });
 });
+
+router.delete('/auto-approve/:email', requireLogin, requireAdmin, (req, res) => {
+  db.prepare('DELETE FROM auto_approved_emails WHERE email = ?').run(req.params.email);
+  res.json({ ok: true });
+});
+
 module.exports = router;
