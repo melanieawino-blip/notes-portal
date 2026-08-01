@@ -2,11 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Lecturer dashboard</title>
+<title>AMIU SmartNotes — Lecturer dashboard</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 <div class="wrap">
+  <div class="brand-bar">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 3.5C5 2.67 5.67 2 6.5 2H14L19 7V20.5C19 21.33 18.33 22 17.5 22H6.5C5.67 22 5 21.33 5 20.5V3.5Z" fill="white" fill-opacity="0.18" stroke="white" stroke-width="1.4"/>
+        <path d="M14 2V6.5C14 6.78 14.22 7 14.5 7H19" stroke="white" stroke-width="1.4"/>
+        <path d="M7 13.5H9.2L10.4 10.5L12.6 16.5L13.8 13.5H17" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="brand-name">AMIU <span>SmartNotes</span></div>
+  </div>
+
   <div class="top-bar">
     <h1>Lecturer dashboard</h1>
     <div style="display:flex;gap:8px">
@@ -15,12 +26,12 @@
     </div>
   </div>
   <p class="sub" id="who"></p>
-  <div class="card" id="pending-banner" style="display:none; border-color:#c99; background:#fff8f0">
+  <div class="card" id="pending-banner" data-accent="coral" style="display:none">
     <strong>Your lecturer account is awaiting admin approval.</strong>
     <p class="note-meta">You can log in, but adding courses and uploading notes will be available once approved.</p>
   </div>
 
-  <div class="card">
+  <div class="card" data-accent="teal">
     <h3>Add a course</h3>
     <label>Course / unit title</label>
     <input id="course-title" placeholder="e.g. Community Health Nursing">
@@ -30,7 +41,7 @@
     <div class="error" id="course-error"></div>
   </div>
 
-  <div class="card">
+  <div class="card" data-accent="marigold">
     <h3>Upload notes</h3>
     <label>Course</label>
     <select id="upload-course"></select>
