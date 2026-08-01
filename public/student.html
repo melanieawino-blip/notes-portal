@@ -2,18 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Student dashboard</title>
+<title>AMIU SmartNotes — My notes</title>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 <div class="wrap">
+  <div class="brand-bar">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 3.5C5 2.67 5.67 2 6.5 2H14L19 7V20.5C19 21.33 18.33 22 17.5 22H6.5C5.67 22 5 21.33 5 20.5V3.5Z" fill="white" fill-opacity="0.18" stroke="white" stroke-width="1.4"/>
+        <path d="M14 2V6.5C14 6.78 14.22 7 14.5 7H19" stroke="white" stroke-width="1.4"/>
+        <path d="M7 13.5H9.2L10.4 10.5L12.6 16.5L13.8 13.5H17" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="brand-name">AMIU <span>SmartNotes</span></div>
+  </div>
+
   <div class="top-bar">
     <h1>Course notes</h1>
     <button class="secondary" style="width:auto" onclick="logout()">Log out</button>
   </div>
   <p class="sub" id="who"></p>
 
-  <div class="card">
+  <div class="card" data-accent="teal">
     <label>Filter by course</label>
     <select id="course-filter" onchange="loadNotes()"></select>
     <label>Filter by lecturer</label>
