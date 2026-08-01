@@ -28,14 +28,14 @@ async function loadLecturers() {
   }
 
   list.innerHTML = lecturers.map(l => `
-    <div class="note-row" style="flex-direction:column;align-items:stretch; ${l.status === 'pending' ? 'background:#fff8f0' : ''}">
+    <div class="note-row" style="flex-direction:column;align-items:stretch; ${l.status === 'pending' ? 'background:var(--marigold-tint)' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div class="note-title">${l.name} — ${l.email}</div>
           <div class="note-meta">
             Staff number: ${l.staff_number || '(none given)'} ·
             Signed up ${new Date(l.created_at).toLocaleDateString()} ·
-            Status: <strong>${l.status}</strong>
+            <span class="badge badge--${l.status}">${l.status}</span>
           </div>
         </div>
         <div style="display:flex;gap:6px">
